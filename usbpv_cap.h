@@ -9,20 +9,10 @@
 #define OV_API
 #endif
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
 
-/** Wait or get a pipe transfer state
- *
- *  \ingroup Group_Host
- *
- *  \param[in] pipe           Pipe pointer, initial by \ref tusb_pipe_open
- *  \param[in] timeout        0 - don't wait, just get the current pipe state
- *                            0xffffffff - wait forever
- *  \return    Channel state, type is \ref channel_state_t
- */
 
 /** callback when got packet
  * 
