@@ -2,7 +2,7 @@
 Demo plugins for USB Packet Viewer.
 
 ## Packet Capture
-A dll for capture data, must implement 4 function, 1 in lua script to register the dll, 3 in dll.
+A dll for capture data, must implement 1 lua function, 3 dll function.
 ### Function in lua
 If there are more than one capture sources, USB packet viewer will display a capture select dialog.
 ```lua
