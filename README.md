@@ -1,5 +1,5 @@
 # USB Packet Viewer demo
-Demo plugins for USB Packet Viewer.
+Demo plugins for [USB Packet Viewer](http://pv.tusb.org).
 
 ## Packet Capture
 A dll for capture data, must implement 1 lua function, 3 dll function.
