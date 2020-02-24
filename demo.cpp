@@ -11,6 +11,7 @@ struct info_t{
   pfn_packet_handler cb;
   DWORD id;
   volatile bool run;
+  int current_speed;
 };
 
 DWORD WINAPI thread(
@@ -29,7 +30,7 @@ DWORD WINAPI thread(
         info->cb(info->context, GetCurrentTime(), 0, msg, sizeof(msg), -1);
       }
       else {
-        info->cb(info->context, GetCurrentTime(), 0, data, 3, 0);
+        info->cb(info->context, GetCurrentTime(), 0, data, 3, info->current_speed);
       }
     }
     Sleep(200);
@@ -62,8 +63,15 @@ do{\
     return false;
   }
   speed += 7;
-  if (strncmp(speed, "FS", 2) != 0) {
-    REPORT_ERROR("speed not FS, got %c%c", speed[0], speed[1]);
+  if (strncmp(speed, "HS", 2) == 0) {
+    info->current_speed = PACKET_STATUS_SPEED_HIGH;
+  }else if (strncmp(speed, "FS", 2) == 0) {
+    info->current_speed = PACKET_STATUS_SPEED_FULL;
+  }
+  else if (strncmp(speed, "LS", 2) == 0) {
+    info->current_speed = PACKET_STATUS_SPEED_LOW;
+  }else{
+    REPORT_ERROR("speed not valid, got %c%c", speed[0], speed[1]);
     return false;
   }
 

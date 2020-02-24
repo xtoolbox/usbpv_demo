@@ -14,6 +14,11 @@ extern "C" {
 #endif // __cplusplus
 
 
+#define  PACKET_STATUS_SPEED_UNKNOWN   0
+#define  PACKET_STATUS_SPEED_LOW       1
+#define  PACKET_STATUS_SPEED_FULL      2
+#define  PACKET_STATUS_SPEED_HIGH      3
+#define  PACKET_STATUS_SPEED_MASK      0x0f
 /** callback when got packet
  * 
  * \param[in] context      passed from usbpv_open
@@ -22,7 +27,7 @@ extern "C" {
  * \param[in] data         packet data
  * \param[in] len          packet length
  * \param[in] status       status < 0, means error, data parameter holds error description, the capture thread will stop on error
- *                         status >= 0 means success
+ *                         status >= 0 means success, \ref PACKET_STATUS_xxx
  * 
  * \return not used
  */

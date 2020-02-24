@@ -5,6 +5,15 @@
 local captureList = {
     "demoCap", -- demoCap.dll
 }
+
+local PS_SPEED_UNKNOWN  = 0
+local PS_SPEED_LOW      = 1
+local PS_SPEED_FULL     = 2
+local PS_SPEED_HIGH     = 3
+local PS_SPEED_SUPER    = 4
+local PS_SPEED_MASK     = 0x0f
+
+
 function valid_capture()
     return table.concat(captureList, ",")
 end
@@ -20,11 +29,12 @@ function open_file(name, packet_handler, context)
     local nak = "\x5a"
     local pkt = ack
     local count = 10
+    local status = PS_SPEED_FULL
     for i=1, count do
         local timestamp_in_second = 1
         local timestamp_in_nano_second = i
         -- pending here to got packet data will not block UI, the file reader is running in a background thread
-        packet_handler(context, timestamp_in_second, timestamp_in_nano_second, pkt, i ,10)
+        packet_handler(context, timestamp_in_second, timestamp_in_nano_second, pkt, status, i ,10)
         pkt = pkt == ack and nak or ack
     end
     return count
@@ -32,10 +42,10 @@ end
 function write_file(name, packet_handler, context)
     local count = 0
     while true do
-        local ts, nano, packet = packet_handler(context)
+        local ts, nano, packet, status = packet_handler(context)
         if ts and nano and packet then
             -- TODO: write packet to file
-            print(ts,nano,#packt)
+            print(ts,nano,#packt, status or 0)
             count = count + 1
         else
             break
@@ -66,8 +76,9 @@ local F_ISO =        "O"
 local F_ERROR =      "E"
 local F_PING  =      "P"
 
-function parser_append_packet(ts, nano, pkt, id, transId, handler, context)
+function parser_append_packet(ts, nano, pkt, status, id, transId, handler, context)
     if parser_info then return end
+    local speed = (status or 0) & PS_SPEED_MASK
     parser_info = {}
     local topItem = "1000;(top name,top data,red,100);(top name2,top data2,blue,100,white,40);(top name3,top data3,yellow,100,red);" .. F_XFER
     local midItem = "1000;(mid name,mid data,red,100);(mid name2,mid data2,blue,100,white,40);(mid name3,mid data3,yellow,100,red);" .. F_TRANSACTION
