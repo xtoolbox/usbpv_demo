@@ -34,14 +34,15 @@ function valid_filter()
 end
 function open_file(name, packet_handler, context)
     --  open and parse the file
-    --  packet_handler(context, ts, nano, packet, current, total)
+    --  packet_handler(context, ts, nano, packet, status or 0, current, total)
     return count -- total packet count in this file
 end
 function write_file(name, packet_handler, context)
     local count = 0
     while true do
-        local ts, nano, packet = packet_handler(context)
+        local ts, nano, packet, status = packet_handler(context)
         if ts and nano and packet then
+            status = status or 0
             -- TODO: write packet to file
             count = count + 1
         else
@@ -59,7 +60,7 @@ function parser_reset()
     -- reset parser state
     -- no return value
 end
-function parser_append_packet(ts, nano, pkt, id, transId, graph_handler, context)
+function parser_append_packet(ts, nano, pkt, status, id, transId, graph_handler, context)
     -- parse the packt
     -- append parse result to graph view, see scripts.lua for graph description format detail
     graph_handler(context, graph_description, transId, id, id1, id2, id3)
