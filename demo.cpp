@@ -1,7 +1,7 @@
 #include "windows.h"
 #include "usbpv_cap.h"
 #include "string.h"
-
+#include "stdio.h"
 
 
 
@@ -12,7 +12,18 @@ struct info_t{
   DWORD id;
   volatile bool run;
   int current_speed;
+  int mul;
+  FILE* fp;
 };
+
+struct Record{
+  UINT32 ts;
+  UINT32 nano;
+  UINT32 act_len;
+  UINT32 org_len;
+};
+
+char buf[4096];
 
 DWORD WINAPI thread(
   LPVOID param
@@ -22,18 +33,36 @@ DWORD WINAPI thread(
   int count = 0;
 
   while (info->run) {
-    UINT8 data[] = { 0xb4,0x01,0x02 };
-    if (info->run) {
-      count++;
-      if (count > 10) {
-        static const char msg[] = "Too many data";
-        info->cb(info->context, GetCurrentTime(), 0, msg, sizeof(msg), -1);
-      }
-      else {
-        info->cb(info->context, GetCurrentTime(), 0, data, 3, info->current_speed);
-      }
+
+    if (info->fp) {
+      do {
+        Record rec;
+        if (fread(&rec, 1, sizeof(rec), info->fp) != sizeof(rec)) {
+          break;
+        }
+        if (fread(buf, 1, rec.act_len, info->fp) != rec.act_len) {
+          break;
+        }
+        info->cb(info->context, rec.ts, rec.nano, buf, rec.act_len, info->current_speed);
+      } while (info->run);
+      static const char msg[] = "File end";
+      info->cb(info->context, GetCurrentTime(), 0, msg, sizeof(msg), -1);
+      break;
     }
-    Sleep(200);
+    else {
+      UINT8 data[] = { 0xb4,0x01,0x02 };
+      if (info->run) {
+        count++;
+        if (count > 10) {
+          static const char msg[] = "Too many data";
+          info->cb(info->context, GetCurrentTime(), 0, msg, sizeof(msg), -1);
+        }
+        else {
+          info->cb(info->context, GetCurrentTime(), 0, data, 3, info->current_speed);
+        }
+      }
+      Sleep(200);
+    }
   }
   static const char msg[] = "Demo capture thread need quit";
   //info->cb(info->context, GetCurrentTime(), 0, msg, sizeof(msg), -2);
@@ -41,15 +70,48 @@ DWORD WINAPI thread(
 }
 
 static const char demoOption[] = "<select,speed,HS,FS,LS>"
-"<file,DataFile>";
+"<file,DataFile,,Pcap File (*.pcap);;All files (*.*)>";
 long  __cdecl usbpv_get_option(char* option, long length)
 {
   strcpy_s(option, length, demoOption);
   return sizeof(sizeof(demoOption));
 }
 
+struct PcapHeader{
+  UINT32 magic_number;   /* magic number */
+  UINT16 version_major;  /* major version number */
+  UINT16 version_minor;  /* minor version number */
+  UINT32 thiszone;       /* GMT to local correction */
+  UINT32 sigfigs;        /* accuracy of timestamps */
+  UINT32 snaplen;        /* max length of captured packets, in octets */
+  UINT32 network;        /* data link type */
+};
+
+#define MS_MAGIC 0xa1b2c3d4
+#define NS_MAGIC 0xa1b23c4d
+#define DLT_USBLL 288
+static bool checkpacp_header(info_t* info)
+{
+  PcapHeader header;
+  fread(&header, sizeof(header), 1, info->fp);
+  if (header.network != DLT_USBLL) {
+    return false;
+  }
+  if (header.magic_number == MS_MAGIC) {
+    info->mul = 1000;
+    return true;
+  }
+  if (header.magic_number == NS_MAGIC) {
+    info->mul = 1;
+    return true;
+  }
+  return false;
+}
+
 static bool parse_option(const char* option, info_t* info)
 {
+  info->fp = NULL;
+
 #define REPORT_ERROR(fmt, ...)\
 do{\
   char temp[1024];\
@@ -82,8 +144,21 @@ do{\
   }
   file += 10;
   if (strncmp(file, "test", 4) != 0) {
-    REPORT_ERROR("file name not test, got %c%c...", file[0], file[1]);
-    return false;
+    char fname[MAX_PATH];
+    strcpy_s(fname, MAX_PATH, file);
+    fname[strlen(fname) - 1] = 0;
+    errno_t e = fopen_s(&info->fp, fname, "rb");
+    if (e != 0) {
+      info->fp = NULL;
+      REPORT_ERROR("File to open %s", fname);
+      return false;
+    }
+    if (!checkpacp_header(info)) {
+      fclose(info->fp);
+      info->fp = NULL;
+      REPORT_ERROR("Unknown file format %s", fname);
+      return false;
+    }
   }
   return true;
 }
@@ -113,8 +188,10 @@ long  __cdecl usbpv_close(void* handle)
   if (handle) {
     info_t* info = (info_t*)handle;
     info->run = false;
-
     WaitForSingleObject(info->h, 1000);
+    if (info->fp != NULL) {
+      fclose(info->fp);
+    }
     delete info;
   }
   return 0;
